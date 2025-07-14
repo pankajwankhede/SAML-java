@@ -1,23 +1,38 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>saml</groupId>
-  <artifactId>saml-idp-auth0</artifactId>
-  <version>1.0</version>
-  <dependencies>
+<dependencies>
+    <!-- OpenSAML Core -->
     <dependency>
-      <groupId>org.opensaml</groupId>
-      <artifactId>opensaml-saml-impl</artifactId>
-      <version>4.2.0</version>
+        <groupId>org.opensaml</groupId>
+        <artifactId>opensaml-core</artifactId>
+        <version>4.2.0</version>
     </dependency>
+    <!-- OpenSAML SAML Implementation -->
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <version>1.70</version>
+        <groupId>org.opensaml</groupId>
+        <artifactId>opensaml-saml-impl</artifactId>
+        <version>4.2.0</version>
     </dependency>
+    <!-- OpenSAML Security Implementation -->
     <dependency>
-      <groupId>org.apache.santuario</groupId>
-      <artifactId>xmlsec</artifactId>
-      <version>2.3.0</version>
+        <groupId>org.opensaml</groupId>
+        <artifactId>opensaml-security-impl</artifactId>
+        <version>4.2.0</version>
     </dependency>
-  </dependencies>
-</project>
+    <!-- XML Tooling (required by OpenSAML) -->
+    <dependency>
+        <groupId>org.opensaml</groupId>
+        <artifactId>opensaml-xmlsec-impl</artifactId>
+        <version>4.2.0</version>
+    </dependency>
+    <!-- Bouncy Castle for cryptography -->
+    <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk15on</artifactId>
+        <version>1.70</version>
+    </dependency>
+    <!-- Apache Santuario for XML security -->
+    <dependency>
+        <groupId>org.apache.santuario</groupId>
+        <artifactId>xmlsec</artifactId>
+        <version>2.3.0</version>
+    </dependency>
+</dependencies>
