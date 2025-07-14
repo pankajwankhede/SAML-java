@@ -3,6 +3,7 @@ import java.security.cert.X509Certificate;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+         InitializationService.initialize();
         String entityId = "urn:auth0";
         String acsUrl = "https://your-tenant.auth0.com/samlp/client12345";
 
