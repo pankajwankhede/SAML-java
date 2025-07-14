@@ -48,7 +48,7 @@ public class SamlResponseSender {
         marshaller.marshall(response);
         Signer.signObject(signature);
 
-        String xml = XMLObjectSupport.nodeToString(response.getDOM());
+        String xml =  XmlUtils.toString(response); //XMLObjectSupport.nodeToString(response.getDOM());
         return Base64.getEncoder().encodeToString(xml.getBytes());
     }
 }
