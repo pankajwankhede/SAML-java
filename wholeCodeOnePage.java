@@ -4,7 +4,9 @@ import org.opensaml.saml.saml2.core.impl.*;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.Marshaller;
 import org.opensaml.core.xml.io.MarshallerFactory;
-import org.opensaml.core.xml.util.XMLObjectSupport;
+import org.opensaml.xmlsec.signature.*;
+import org.opensaml.xmlsec.signature.impl.*;
+import org.opensaml.xmlsec.signature.support.SAMLSignatureProfileValidator;
 
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
@@ -21,41 +23,44 @@ import java.util.UUID;
 public class Main {
 
     public static void main(String[] args) throws Exception {
+        // Init OpenSAML
         InitializationService.initialize();
 
-        // Load public X.509 cert from PEM
-        String certPath = "src/main/resources/public-cert.pem";
-        X509Certificate cert = loadCertificate(certPath);
+        // Load X.509 PEM certificate
+        X509Certificate cert = loadCertificate("src/main/resources/public-cert.pem");
 
-        // Build SAML assertion
+        // Create Assertion
         Assertion assertion = buildAssertion("urn:auth0", "user@example.com");
 
-        // Build SAML Response
+        // Optionally embed X.509 cert inside KeyInfo (only if needed for metadata / debugging)
+        KeyInfo keyInfo = buildKeyInfo(cert);
+
+        // Create SAML Response
         Response response = buildResponse("https://your-auth0-domain.auth0.com/samlp/YOUR_CLIENT_ID", assertion);
 
-        // Marshall
+        // Marshall to DOM
         MarshallerFactory marshallerFactory = XMLObjectProviderRegistrySupport.getMarshallerFactory();
         Marshaller marshaller = marshallerFactory.getMarshaller(response);
         marshaller.marshall(response);
 
-        // Convert to XML string
-        String xml = xmlToString(response.getDOM());
-        String encoded = Base64.getEncoder().encodeToString(xml.getBytes());
+        // Convert to base64
+        String xml = toString(response.getDOM());
+        String base64 = Base64.getEncoder().encodeToString(xml.getBytes());
 
-        // Print HTML form for POST
+        // Print HTML form
         System.out.println("<form method='POST' action='https://your-auth0-domain.auth0.com/samlp/YOUR_CLIENT_ID'>");
-        System.out.println("<input type='hidden' name='SAMLResponse' value='" + encoded + "'/>");
-        System.out.println("<input type='submit' value='Login via IdP'/>");
+        System.out.println("<input type='hidden' name='SAMLResponse' value='" + base64 + "'/>");
+        System.out.println("<input type='submit' value='Submit'/>");
         System.out.println("</form>");
     }
 
-    private static X509Certificate loadCertificate(String path) throws Exception {
-        byte[] certBytes = Files.readAllBytes(Paths.get(path));
+    static X509Certificate loadCertificate(String pemPath) throws Exception {
+        byte[] certBytes = Files.readAllBytes(Paths.get(pemPath));
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         return (X509Certificate) cf.generateCertificate(new java.io.ByteArrayInputStream(certBytes));
     }
 
-    private static Assertion buildAssertion(String issuerStr, String userEmail) {
+    static Assertion buildAssertion(String issuerStr, String userEmail) {
         Assertion assertion = new AssertionBuilder().buildObject();
         assertion.setID("_" + UUID.randomUUID());
         assertion.setIssueInstant(Instant.now());
@@ -72,23 +77,10 @@ public class Main {
         subject.setNameID(nameID);
         assertion.setSubject(subject);
 
-        AttributeStatement attrStmt = new AttributeStatementBuilder().buildObject();
-        Attribute attr = new AttributeBuilder().buildObject();
-        attr.setName("email");
-
-        XSStringBuilder stringBuilder = (XSStringBuilder) XMLObjectProviderRegistrySupport.getBuilderFactory()
-                .<XSStringBuilder>getBuilder(XSString.TYPE_NAME);
-        XSString emailValue = stringBuilder.buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
-        emailValue.setValue(userEmail);
-
-        attr.getAttributeValues().add(emailValue);
-        attrStmt.getAttributes().add(attr);
-        assertion.getAttributeStatements().add(attrStmt);
-
         return assertion;
     }
 
-    private static Response buildResponse(String acsUrl, Assertion assertion) {
+    static Response buildResponse(String acsUrl, Assertion assertion) {
         Response response = new ResponseBuilder().buildObject();
         response.setID("_" + UUID.randomUUID());
         response.setIssueInstant(Instant.now());
@@ -104,13 +96,24 @@ public class Main {
         return response;
     }
 
-    private static String xmlToString(org.w3c.dom.Element element) throws Exception {
-        TransformerFactory tf = TransformerFactory.newInstance();
-        Transformer transformer = tf.newTransformer();
-        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+    static KeyInfo buildKeyInfo(X509Certificate cert) throws Exception {
+        X509Data x509Data = new X509DataBuilder().buildObject();
+        X509CertificateBuilder certBuilder = new X509CertificateBuilder();
+        org.opensaml.xmlsec.signature.X509Certificate samlCert = certBuilder.buildObject();
+        samlCert.setValue(Base64.getEncoder().encodeToString(cert.getEncoded()));
+        x509Data.getX509Certificates().add(samlCert);
+
+        KeyInfo keyInfo = new KeyInfoBuilder().buildObject();
+        keyInfo.getX509Datas().add(x509Data);
+
+        return keyInfo;
+    }
+
+    static String toString(org.w3c.dom.Element element) throws Exception {
+        Transformer tf = TransformerFactory.newInstance().newTransformer();
+        tf.setOutputProperty(OutputKeys.INDENT, "yes");
         StringWriter writer = new StringWriter();
-        transformer.transform(new DOMSource(element), new StreamResult(writer));
+        tf.transform(new DOMSource(element), new StreamResult(writer));
         return writer.toString();
     }
 }
