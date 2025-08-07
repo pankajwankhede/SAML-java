@@ -92,6 +92,11 @@ public class IdpSimulatorController {
 </form>
 <script>document.getElementById("samlForm").submit();</script>
 ```
+Postman     
+curl -X POST <ACS_URL> \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "SAMLResponse=<BASE64_SAML_RESPONSE>" \
+  -d "RelayState=abc123"
 
 ---
 
