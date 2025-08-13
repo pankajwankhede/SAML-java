@@ -1,0 +1,155 @@
+package com.example.idp;
+
+import org.opensaml.core.xml.XMLObjectBuilderFactory;
+import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
+import org.opensaml.saml.saml2.core.*;
+import org.opensaml.xmlsec.signature.*;
+import org.opensaml.xmlsec.signature.support.Signer;
+import org.opensaml.xmlsec.signature.support.SignatureConstants;
+import org.opensaml.security.x509.BasicX509Credential;
+import org.opensaml.xmlsec.keyinfo.impl.X509KeyInfoGeneratorFactory;
+import net.shibboleth.utilities.java.support.xml.SerializeSupport;
+
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+public class SamlIssuer {
+
+    private final XMLObjectBuilderFactory bf = XMLObjectProviderRegistrySupport.getBuilderFactory();
+    private final BasicX509Credential signingCred;
+
+    public SamlIssuer(X509Certificate cert, PrivateKey key) {
+        this.signingCred = new BasicX509Credential(cert, key);
+    }
+
+    private <T> T build(Class<T> clazz, QName qname) {
+        @SuppressWarnings("unchecked")
+        T obj = (T) bf.getBuilder(qname).buildObject(qname);
+        return obj;
+    }
+
+    public Response buildSignedResponse(String idpEntityId,
+                                        String spEntityId,
+                                        String acsUrl,
+                                        String nameIdValue,
+                                        List<AttributeData> attributes) throws Exception {
+
+        // Issuer
+        Issuer issuer = build(Issuer.class, Issuer.DEFAULT_ELEMENT_NAME);
+        issuer.setValue(idpEntityId);
+
+        // NameID
+        NameID nameID = build(NameID.class, NameID.DEFAULT_ELEMENT_NAME);
+        nameID.setFormat(NameIDType.PERSISTENT);
+        nameID.setValue(nameIdValue);
+
+        // SubjectConfirmationData
+        SubjectConfirmationData scd = build(SubjectConfirmationData.class, SubjectConfirmationData.DEFAULT_ELEMENT_NAME);
+        scd.setNotOnOrAfter(Instant.now().plusSeconds(5 * 60));
+        scd.setRecipient(acsUrl);
+
+        SubjectConfirmation sc = build(SubjectConfirmation.class, SubjectConfirmation.DEFAULT_ELEMENT_NAME);
+        sc.setMethod(SubjectConfirmation.METHOD_BEARER);
+        sc.setSubjectConfirmationData(scd);
+
+        Subject subject = build(Subject.class, Subject.DEFAULT_ELEMENT_NAME);
+        subject.setNameID(nameID);
+        subject.getSubjectConfirmations().add(sc);
+
+        // Conditions
+        Conditions cond = build(Conditions.class, Conditions.DEFAULT_ELEMENT_NAME);
+        cond.setNotBefore(Instant.now().minusSeconds(SamlIdpConfig.ALLOWED_CLOCK_SKEW_SECONDS));
+        cond.setNotOnOrAfter(Instant.now().plusSeconds(5 * 60));
+
+        Audience aud = build(Audience.class, Audience.DEFAULT_ELEMENT_NAME);
+        aud.setURI(spEntityId);
+        AudienceRestriction ar = build(AudienceRestriction.class, AudienceRestriction.DEFAULT_ELEMENT_NAME);
+        ar.getAudiences().add(aud);
+        cond.getAudienceRestrictions().add(ar);
+
+        // AuthnStatement
+        AuthnContextClassRef classRef = build(AuthnContextClassRef.class, AuthnContextClassRef.DEFAULT_ELEMENT_NAME);
+        classRef.setAuthnContextClassRef(AuthnContext.PASSWORD_AUTHN_CTX);
+
+        AuthnContext authnContext = build(AuthnContext.class, AuthnContext.DEFAULT_ELEMENT_NAME);
+        authnContext.setAuthnContextClassRef(classRef);
+
+        AuthnStatement authnStatement = build(AuthnStatement.class, AuthnStatement.DEFAULT_ELEMENT_NAME);
+        authnStatement.setAuthnInstant(Instant.now());
+        authnStatement.setSessionIndex(UUID.randomUUID().toString());
+        authnStatement.setAuthnContext(authnContext);
+
+        // Attributes
+        AttributeStatement attrStmt = build(AttributeStatement.class, AttributeStatement.DEFAULT_ELEMENT_NAME);
+        for (AttributeData ad : attributes) {
+            Attribute attr = build(Attribute.class, Attribute.DEFAULT_ELEMENT_NAME);
+            attr.setName(ad.name);
+            for (String v : ad.values) {
+                // Build simple XSString value
+                org.opensaml.core.xml.schema.XSString xs = (org.opensaml.core.xml.schema.XSString)
+                    bf.getBuilder(org.opensaml.core.xml.schema.XSString.TYPE_NAME)
+                      .buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, org.opensaml.core.xml.schema.XSString.TYPE_NAME);
+                xs.setValue(v);
+                attr.getAttributeValues().add(xs);
+            }
+            attrStmt.getAttributes().add(attr);
+        }
+
+        // Build Assertion
+        Assertion assertion = build(Assertion.class, Assertion.DEFAULT_ELEMENT_NAME);
+        assertion.setID("_" + UUID.randomUUID());
+        assertion.setIssueInstant(Instant.now());
+        assertion.setIssuer(issuer);
+        assertion.setSubject(subject);
+        assertion.setConditions(cond);
+        assertion.getAuthnStatements().add(authnStatement);
+        assertion.getAttributeStatements().add(attrStmt);
+
+        // Sign Assertion
+        Signature signature = (Signature) bf.getBuilder(Signature.DEFAULT_ELEMENT_NAME).buildObject(Signature.DEFAULT_ELEMENT_NAME);
+        signature.setSigningCredential(signingCred);
+        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+        signature.setCanonicalizationAlgorithm("http://www.w3.org/2001/10/xml-exc-c14n#");
+
+        // KeyInfo
+        X509KeyInfoGeneratorFactory kif = new X509KeyInfoGeneratorFactory();
+        kif.setEmitEntityCertificate(true);
+        signature.setKeyInfo(kif.newInstance().generate(signingCred));
+
+        assertion.setSignature(signature);
+
+        // Marshal then sign
+        org.opensaml.core.xml.io.MarshallerFactory mf = XMLObjectProviderRegistrySupport.getMarshallerFactory();
+        var marshaller = mf.getMarshaller(assertion);
+        var element = marshaller.marshall(assertion);
+        Signer.signObject(signature);
+
+        // Wrap in Response
+        Response response = build(Response.class, Response.DEFAULT_ELEMENT_NAME);
+        response.setID("_" + UUID.randomUUID());
+        response.setIssueInstant(Instant.now());
+        response.setDestination(acsUrl);
+        response.setIssuer(issuer);
+
+        // Status
+        StatusCode sc = build(StatusCode.class, StatusCode.DEFAULT_ELEMENT_NAME);
+        sc.setValue(StatusCode.SUCCESS);
+        Status status = build(Status.class, Status.DEFAULT_ELEMENT_NAME);
+        status.setStatusCode(sc);
+        response.setStatus(status);
+
+        response.getAssertions().add(assertion);
+        return response;
+    }
+
+    public static class AttributeData {
+        public final String name;
+        public final List<String> values;
+        public AttributeData(String name, List<String> values) { this.name = name; this.values = values; }
+    }
+}
+======================
+
