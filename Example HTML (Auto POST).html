@@ -1,0 +1,13 @@
+<html>
+  <body onload="document.forms[0].submit()">
+    <form action="https://sp.example.com/saml/acs" method="post">
+      <input type="hidden" name="SAMLResponse" 
+             value="BASE64_ENCODED_SAML_RESPONSE" />
+      <input type="hidden" name="RelayState" value="xyz123" />
+      <noscript>
+        <p>JavaScript is disabled. Click the button below to continue.</p>
+        <input type="submit" value="Continue" />
+      </noscript>
+    </form>
+  </body>
+</html>
