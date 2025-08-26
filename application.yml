@@ -1,0 +1,13 @@
+saml:
+  idp:
+    certificate: |
+      -----BEGIN CERTIFICATE-----
+      MIIC+zCCAeOgAwIBAgIJALfBblFzYXUOMA0GCSqGSIb3DQEBCwUAMBMxETAPBgNV
+      BAMMCElEUC1UZXN0MB4XDTI1MDgxNzE0MDAwMFoXDTI2MDgxNzE0MDAwMFowEzER
+      MA8GA1UEAwwISURQLVRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+      AQDmrS4nbuYX...
+      -----END CERTIFICATE-----
+    private-key: |
+      -----BEGIN PRIVATE KEY-----
+      MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...
+      -----END PRIVATE KEY-----
