@@ -86,3 +86,9 @@ const SamlPostIframe = ({ acsUrl, samlResponse, relayState }) => {
 
 export default SamlPostIframe;
 
+use ==== <SamlPostIframe
+  acsUrl="https://your-sp.com/saml/acs"
+  samlResponse={"BASE64_ENCODED_SAML_RESPONSE_FROM_IDP"}
+  relayState={"optionalRelayStateValue"}
+/>
+
