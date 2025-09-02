@@ -37,3 +37,47 @@ function cleanBase64(b64) {
     .replace(/-/g, "+")
     .replace(/_/g, "/");
 }
+
+==============exmp2=================
+  import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function SamlAutoPost({ acsUrl, relayState }) {
+  const [samlResponse, setSamlResponse] = useState(null);
+
+  useEffect(() => {
+    // 1. Fetch SAMLResponse from backend
+    axios.get("/api/saml/response", { responseType: "text" })
+      .then(res => {
+        setSamlResponse(res.data);
+      })
+      .catch(err => {
+        console.error("Error fetching SAMLResponse:", err);
+      });
+  }, []);
+
+  useEffect(() => {
+    // 2. Once samlResponse is ready, auto-submit form
+    if (samlResponse) {
+      const form = document.getElementById("samlForm");
+      if (form) form.submit();
+    }
+  }, [samlResponse]);
+
+  return (
+    <>
+      <iframe name="samlFrame" style={{ display: "none" }} />
+
+      <form
+        id="samlForm"
+        method="POST"
+        action={acsUrl}
+        target="samlFrame"
+      >
+        <input type="hidden" name="SAMLResponse" value={samlResponse || ""} />
+        {relayState && <input type="hidden" name="RelayState" value={relayState} />}
+      </form>
+    </>
+  );
+}
+
