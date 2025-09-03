@@ -115,3 +115,13 @@ export default function SamlTester({ acsUrl, samlResponse, relayState }) {
   samlResponse="PHNhbWxwOlJlc3BvbnNlIHhtb..."
   relayState="relay123"
 />
+
+  ===axios.get("/api/saml/response").then(res => {
+  let samlResp = res.data.samlResponse;
+
+  // Force string + cleanup
+  samlResp = String(samlResp).replace(/\s+/g, "").replace(/^"+|"+$/g, "");
+
+  setSamlResponse(samlResp);
+});
+
