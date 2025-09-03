@@ -80,4 +80,66 @@ export default function SamlAutoPost({ acsUrl, relayState }) {
     </>
   );
 }
+==================exmaple 3========================
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function SamlAutoPost({ acsUrl, relayState }) {
+  const [samlResponse, setSamlResponse] = useState("");
+
+  useEffect(() => {
+    // 1. Fetch SAMLResponse from backend API
+    axios.get("/api/saml/response")
+      .then(res => {
+        // Convert backend value into clean string
+        const responseStr = String(res.data.samlResponse || "").trim();
+        setSamlResponse(responseStr);
+      })
+      .catch(err => console.error("Error fetching SAMLResponse", err));
+  }, []);
+
+  useEffect(() => {
+    if (!samlResponse) return;
+
+    // 2. Create form dynamically
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = acsUrl;
+    form.target = "samlIframe"; // posts inside iframe
+
+    // 3. Add hidden SAMLResponse input
+    const samlInput = document.createElement("input");
+    samlInput.type = "hidden";
+    samlInput.name = "SAMLResponse";
+    samlInput.value = samlResponse; // ✅ guaranteed string
+    form.appendChild(samlInput);
+
+    // 4. Add RelayState if provided
+    if (relayState) {
+      const relayInput = document.createElement("input");
+      relayInput.type = "hidden";
+      relayInput.name = "RelayState";
+      relayInput.value = String(relayState).trim();
+      form.appendChild(relayInput);
+    }
+
+    // 5. Attach form to DOM & submit
+    document.body.appendChild(form);
+    form.submit();
+
+    // 6. Cleanup after submit
+    return () => {
+      document.body.removeChild(form);
+    };
+  }, [samlResponse, acsUrl, relayState]);
+
+  return (
+    <iframe
+      name="samlIframe"
+      style={{ display: "none" }}
+      title="SAML ACS"
+    />
+  );
+}
 
